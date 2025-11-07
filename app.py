@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, abort
 from flask_sqlalchemy import SQLAlchemy
 
-DB_FILE = os.getenv("DB_PATH", "/data/servicedesk.db")
+DB_FILE = os.getenv("DB_PATH", "/data/tickets.db")
 os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
 
 app = Flask(__name__)
