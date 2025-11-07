@@ -1,37 +1,24 @@
-{% extends "layout.html" %}{% block content %}
-<h3>#{{t.id}} {{t.title}}</h3>
-<p><mark>{{t.status}}</mark> · 우선: {{t.priority}} · 요청자: {{t.requester}} · 담당: {{t.assignee or '-'}}</p>
-<article>{{t.body}}</article>
-<p><small>생성 {{t.created_at|dt}} · 수정 {{t.updated_at|dt}}</small></p>
-<hr>
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>요청 상세</title></head>
+<body>
+  <h1>[#{{ ticket.id }}] {{ ticket.title }}</h1>
+  <p><b>요청자:</b> {{ ticket.requester }} / <b>담당자:</b> {{ ticket.assignee or '-' }}</p>
+  <p><b>상태:</b> {{ ticket.status }} / <b>우선순위:</b> {{ ticket.priority }}</p>
+  <pre>{{ ticket.content }}</pre>
 
-<h4>상태/담당 변경 (관리자)</h4>
-<form method="post" action="/t/{{t.id}}/update">
-  <label>상태
-    <select name="status">
-      {% for s in ['open','wip','done'] %}
-      <option value="{{s}}" {% if t.status==s %}selected{% endif %}>{{s}}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>담당자<input name="assignee" value="{{t.assignee}}"></label>
-  <label>관리자 토큰<input name="token" type="password" placeholder="ENV ADMIN_TOKEN"></label>
-  <button type="submit">적용</button>
-</form>
-<hr>
+  <form method="post">
+    <label>상태
+      <select name="status">
+        <option value="open"  {{ 'selected' if ticket.status=='open'  else '' }}>open</option>
+        <option value="prog"  {{ 'selected' if ticket.status=='prog'  else '' }}>prog</option>
+        <option value="done"  {{ 'selected' if ticket.status=='done'  else '' }}>done</option>
+      </select>
+    </label>
+    <label>담당자 <input name="assignee" value="{{ ticket.assignee or '' }}"></label>
+    <button type="submit">저장</button>
+  </form>
 
-<h4>댓글</h4>
-<form method="post" action="/t/{{t.id}}/comment">
-  <label>작성자<input name="author" placeholder="이름"></label>
-  <label>내용<textarea name="body" rows="4" required></textarea></label>
-  <button type="submit">댓글 등록</button>
-</form>
-
-<ul>
-{% for c in t.comments %}
-  <li><b>{{c.author}}</b> · {{c.created_at|dt}} <br>{{c.body}}</li>
-{% else %}
-  <li>댓글 없음</li>
-{% endfor %}
-</ul>
-{% endblock %}
+  <p><a href="{{ url_for('index') }}">← 목록</a></p>
+</body>
+</html>

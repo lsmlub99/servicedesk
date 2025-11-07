@@ -1,37 +1,19 @@
-{% extends "layout.html" %}{% block content %}
-<form method="get" style="display:flex;gap:.5rem;margin-bottom:1rem">
-  <input name="q" placeholder="검색(제목/내용)" value="{{q}}">
-  <select name="status">
-    <option value="">상태</option>
-    {% for s in ['open','wip','done'] %}
-      <option value="{{s}}" {% if q_status==s %}selected{% endif %}>{{s}}</option>
-    {% endfor %}
-  </select>
-  <select name="priority">
-    <option value="">우선순위</option>
-    {% for p in ['low','med','high'] %}
-      <option value="{{p}}" {% if q_priority==p %}selected{% endif %}>{{p}}</option>
-    {% endfor %}
-  </select>
-  <button type="submit">필터</button>
-</form>
-
-<table>
-  <thead><tr><th>ID</th><th>제목</th><th>상태</th><th>우선</th><th>요청자</th><th>담당</th><th>수정</th></tr></thead>
-  <tbody>
-  {% for t in tickets %}
-    <tr>
-      <td>{{t.id}}</td>
-      <td><a href="/t/{{t.id}}">{{t.title}}</a></td>
-      <td>{{t.status}}</td>
-      <td>{{t.priority}}</td>
-      <td>{{t.requester}}</td>
-      <td>{{t.assignee or '-'}}</td>
-      <td>{{t.updated_at|dt}}</td>
-    </tr>
-  {% else %}
-    <tr><td colspan="7">데이터 없음</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endblock %}
+<tbody>
+{% for t in tickets %}
+  <tr>
+    <td>{{ t.id }}</td>
+    <td>
+      <a href="{{ url_for('ticket_detail', tid=t.id) }}">
+        {{ t.title }}
+      </a>
+    </td>
+    <td>{{ t.status }}</td>
+    <td>{{ t.priority }}</td>
+    <td>{{ t.requester }}</td>
+    <td>{{ t.assignee or '-' }}</td>
+    <td>{{ t.updated_at|dt }}</td>
+  </tr>
+{% else %}
+  <tr><td colspan="7">데이터 없음</td></tr>
+{% endfor %}
+</tbody>
