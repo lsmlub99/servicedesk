@@ -1,77 +1,123 @@
-from flask import Flask, render_template, request, redirect, url_for
+import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+
+from flask import Flask, render_template, request, redirect, url_for, abort
+from flask_sqlalchemy import SQLAlchemy
+
+# --------------------------------------------------------------------------------------
+# Config
+# --------------------------------------------------------------------------------------
+DB_FILE = os.getenv("DB_PATH", "/data/servicedesk.db")  # 컨테이너 볼륨 경로
+os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
 
 app = Flask(__name__)
+# 절대 경로는 슬래시 4개 사용
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_FILE}" if DB_FILE.startswith("/") else f"sqlite:///{os.path.abspath(DB_FILE)}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# === DB 설정 ===
-DATABASE_URL = "sqlite:///data/servicedesk.db"
-engine = create_engine(DATABASE_URL, echo=False)
-Base = declarative_base()
+db = SQLAlchemy(app)
 
-class Ticket(Base):
+
+# --------------------------------------------------------------------------------------
+# Models
+# --------------------------------------------------------------------------------------
+class Ticket(db.Model):
     __tablename__ = "tickets"
-    id = Column(Integer, primary_key=True)
-    title = Column(String(200))
-    description = Column(Text)
-    status = Column(String(20), default="open")
-    priority = Column(String(10), default="med")
-    requester = Column(String(50))
-    assignee = Column(String(50), default="-")
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-Base.metadata.create_all(engine)
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    requester = db.Column(db.String(50), nullable=False)
+    assignee = db.Column(db.String(50), nullable=True)
+    priority = db.Column(db.String(10), nullable=False, default="med")   # low/med/high
+    status = db.Column(db.String(10), nullable=False, default="open")    # open/hold/done
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
-Session = sessionmaker(bind=engine)
-session = Session()
+    def __repr__(self) -> str:
+        return f"<Ticket {self.id}:{self.title}>"
 
-# === 라우트 ===
-@app.route('/')
+
+with app.app_context():
+    db.create_all()
+
+
+# --------------------------------------------------------------------------------------
+# Filters
+# --------------------------------------------------------------------------------------
+@app.template_filter("dt")
+def fmt_dt(v: datetime):
+    return v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime) else ""
+
+
+# --------------------------------------------------------------------------------------
+# Routes
+# --------------------------------------------------------------------------------------
+@app.get("/")
 def index():
-    q = request.args.get("q", "")
-    status = request.args.get("status", "")
-    priority = request.args.get("priority", "")
+    """요청 목록 + 필터"""
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "").strip()
+    priority = request.args.get("priority", "").strip()
 
-    tickets = session.query(Ticket)
+    query = Ticket.query
     if q:
-        tickets = tickets.filter(Ticket.title.contains(q) | Ticket.description.contains(q))
+        query = query.filter((Ticket.title.contains(q)) | (Ticket.content.contains(q)))
     if status:
-        tickets = tickets.filter(Ticket.status == status)
+        query = query.filter(Ticket.status == status)
     if priority:
-        tickets = tickets.filter(Ticket.priority == priority)
+        query = query.filter(Ticket.priority == priority)
 
-    tickets = tickets.order_by(Ticket.updated_at.desc()).all()
+    tickets = query.order_by(Ticket.updated_at.desc()).all()
     return render_template("index.html", tickets=tickets, q=q, status=status, priority=priority)
 
-@app.route('/new', methods=['GET', 'POST'])
+
+@app.route("/new", methods=["GET", "POST"])
 def new_ticket():
-    if request.method == 'POST':
-        t = Ticket(
-            title=request.form['title'],
-            description=request.form['description'],
-            priority=request.form['priority'],
-            requester=request.form['requester']
-        )
-        session.add(t)
-        session.commit()
-        return redirect(url_for('index'))
-    return render_template('new.html')
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        content = request.form.get("content", "").strip()
+        requester = request.form.get("requester", "").strip()
+        priority = request.form.get("priority", "med").strip() or "med"
 
-@app.route('/ticket/<int:id>')
-def ticket_detail(id):
-    t = session.query(Ticket).get(id)
-    return render_template('detail.html', ticket=t)
+        if not title or not requester:
+            abort(400, "title/requester required")
 
-@app.route('/version')
+        t = Ticket(title=title, content=content, requester=requester, priority=priority)
+        db.session.add(t)
+        db.session.commit()
+        return redirect(url_for("index"))
+
+    return render_template("new.html")
+
+
+@app.route("/ticket/<int:tid>", methods=["GET", "POST"])
+def ticket_detail(tid: int):
+    t = Ticket.query.get_or_404(tid)
+    if request.method == "POST":
+        t.status = request.form.get("status", t.status)
+        t.assignee = request.form.get("assignee", t.assignee)
+        db.session.commit()
+        return redirect(url_for("index"))
+    return render_template("detail.html", ticket=t)
+
+
+# --- 운영 편의 ---
+@app.get("/healthz")
+def healthz():
+    return "ok", 200
+
+
+@app.get("/version")
 def version():
-    return "<h1>🚀 Servicedesk Flask App (v2 Test)</h1>"
+    # 배포 확인용 간단 엔드포인트
+    tag = os.getenv("APP_VERSION", "v2 Test")
+    return f"<h1>🚀 Servicedesk Flask App ({tag})</h1>", 200
 
-@app.template_filter("dt")
-def fmt_dt(v):
-    return v.strftime("%Y-%m-%d %H:%M")
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+# --------------------------------------------------------------------------------------
+# Local run (컨테이너에서는 gunicorn이 사용함)
+# --------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    # 개발 로컬 실행용
+    app.run(host="0.0.0.0", port=8080, debug=True)
