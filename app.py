@@ -38,6 +38,10 @@ class Comment(Base):
 
 Base.metadata.create_all(engine)
 
+@app.route('/')
+def index():
+    return "<h1>🚀 Servicedesk Flask App (v2 Test)</h1>"
+
 @app.template_filter("dt")
 def fmt_dt(v): return v.strftime("%Y-%m-%d %H:%M")
 
