@@ -1,0 +1,37 @@
+{% extends "layout.html" %}{% block content %}
+<h3>#{{t.id}} {{t.title}}</h3>
+<p><mark>{{t.status}}</mark> · 우선: {{t.priority}} · 요청자: {{t.requester}} · 담당: {{t.assignee or '-'}}</p>
+<article>{{t.body}}</article>
+<p><small>생성 {{t.created_at|dt}} · 수정 {{t.updated_at|dt}}</small></p>
+<hr>
+
+<h4>상태/담당 변경 (관리자)</h4>
+<form method="post" action="/t/{{t.id}}/update">
+  <label>상태
+    <select name="status">
+      {% for s in ['open','wip','done'] %}
+      <option value="{{s}}" {% if t.status==s %}selected{% endif %}>{{s}}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>담당자<input name="assignee" value="{{t.assignee}}"></label>
+  <label>관리자 토큰<input name="token" type="password" placeholder="ENV ADMIN_TOKEN"></label>
+  <button type="submit">적용</button>
+</form>
+<hr>
+
+<h4>댓글</h4>
+<form method="post" action="/t/{{t.id}}/comment">
+  <label>작성자<input name="author" placeholder="이름"></label>
+  <label>내용<textarea name="body" rows="4" required></textarea></label>
+  <button type="submit">댓글 등록</button>
+</form>
+
+<ul>
+{% for c in t.comments %}
+  <li><b>{{c.author}}</b> · {{c.created_at|dt}} <br>{{c.body}}</li>
+{% else %}
+  <li>댓글 없음</li>
+{% endfor %}
+</ul>
+{% endblock %}

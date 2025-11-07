@@ -1,0 +1,16 @@
+{% extends "layout.html" %}{% block content %}
+<h3>새 요청 등록</h3>
+<form method="post" action="/new">
+  <label>제목<input name="title" required></label>
+  <label>내용<textarea name="body" rows="6" required></textarea></label>
+  <label>요청자<input name="requester" required></label>
+  <label>우선순위
+    <select name="priority">
+      <option value="low">low</option>
+      <option value="med" selected>med</option>
+      <option value="high">high</option>
+    </select>
+  </label>
+  <button type="submit">등록</button>
+</form>
+{% endblock %}

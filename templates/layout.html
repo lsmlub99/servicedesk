@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Service Desk</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>header{margin:1rem 0}</style>
+</head>
+<body class="container">
+<header>
+  <hgroup><h1>Service Desk</h1><p>간단 요청/장애 접수 · 상태 추적</p></hgroup>
+  <nav><ul><li><a href="/">목록</a></li><li><a href="/new">새 요청</a></li></ul></nav>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>
