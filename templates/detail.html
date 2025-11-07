@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><title>요청 상세</title></head>
+<head>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="utf-8"><title>요청 상세</title></head>
 <body>
   <h1>[#{{ ticket.id }}] {{ ticket.title }}</h1>
   <p><b>요청자:</b> {{ ticket.requester }} / <b>담당자:</b> {{ ticket.assignee or '-' }}</p>

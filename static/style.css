@@ -1,0 +1,10 @@
+:root { --fg:#111; --muted:#666; --line:#eee; --link:#0b63f6; }
+body{font-family:system-ui,sans-serif;margin:32px;color:var(--fg)}
+h1{margin:0 0 16px}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+.toolbar{margin:16px 0;display:flex;gap:8px;flex-wrap:wrap}
+input,select,button,textarea{padding:6px 10px;border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid var(--line)}
+pre{white-space:pre-wrap;background:#fafafa;border:1px solid var(--line);padding:12px;border-radius:8px}

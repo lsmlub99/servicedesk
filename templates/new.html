@@ -1,16 +1,36 @@
-{% extends "layout.html" %}{% block content %}
-<h3>새 요청 등록</h3>
-<form method="post" action="/new">
-  <label>제목<input name="title" required></label>
-  <label>내용<textarea name="body" rows="6" required></textarea></label>
-  <label>요청자<input name="requester" required></label>
-  <label>우선순위
-    <select name="priority">
-      <option value="low">low</option>
-      <option value="med" selected>med</option>
-      <option value="high">high</option>
-    </select>
-  </label>
-  <button type="submit">등록</button>
-</form>
-{% endblock %}
+<!doctype html>
+<html lang="ko">
+<head>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="utf-8" />
+  <title>새 요청</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 32px; }
+    label { display:block; margin: 8px 0; }
+    input, select, textarea { width: 100%; max-width: 520px; padding: 6px 8px; }
+    textarea { height: 160px; }
+    a { color: #0b63f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <p><a href="{{ url_for('index') }}">← 목록</a></p>
+  <h1>새 요청</h1>
+  <form method="post">
+    <label>제목 <input name="title" required></label>
+    <label>요청자 <input name="requester" required></label>
+    <label>우선순위
+      <select name="priority">
+        <option value="low">low</option>
+        <option value="med" selected>med</option>
+        <option value="high">high</option>
+      </select>
+    </label>
+    <label>내용
+      <textarea name="content"></textarea>
+    </label>
+    <button type="submit">등록</button>
+  </form>
+</body>
+</html>
+
