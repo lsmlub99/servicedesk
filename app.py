@@ -240,87 +240,58 @@ def new_ticket():
         return redirect(url_for("ticket_detail", tid=t.id))
     return render_template("new.html")
 
-@app.route("/ticket/<int:tid>", methods=["GET", "POST"])
+# 상세: 항상 atts 라는 이름으로 넘김
+@app.route("/ticket/<int:tid>")
 def ticket_detail(tid: int):
     t = Ticket.query.get_or_404(tid)
-    if request.method == "POST":
-        actor = request.form.get("actor", "user")
-        # 상태/담당자/우선순위 변경 처리
-        new_status   = request.form.get("status")
-        new_assignee = request.form.get("assignee")
-        new_priority = request.form.get("priority")
-        changed = False
-
-        if new_status and new_status != t.status:
-            add_event(t.id, actor, "status", t.status, new_status)
-            t.status = new_status
-            changed = True
-        if new_assignee is not None and new_assignee != (t.assignee or ""):
-            add_event(t.id, actor, "assignee", t.assignee or "", new_assignee)
-            t.assignee = new_assignee
-            changed = True
-        if new_priority and new_priority != t.priority:
-            add_event(t.id, actor, "priority", t.priority, new_priority)
-            t.priority = new_priority
-            changed = True
-
-        if changed:
-            db.session.commit()
-        return redirect(url_for("ticket_detail", tid=t.id))
-
-    comments    = Comment.query.filter_by(ticket_id=t.id).order_by(Comment.created_at).all()
-    attachments = Attachment.query.filter_by(ticket_id=t.id).order_by(Attachment.created_at).all()
-    events      = Event.query.filter_by(ticket_id=t.id).order_by(Event.created_at.desc()).all()
-    return render_template("detail.html",
-                           ticket=t,
-                           comments=comments,
-                           attachments=attachments,
-                           events=events)
+    atts = Attachment.query.filter_by(ticket_id=tid).order_by(Attachment.created_at.asc()).all()
+    comments = Comment.query.filter_by(ticket_id=tid).order_by(Comment.created_at.asc()).all()
+    return render_template(
+        "detail.html",
+        ticket=t,
+        comments=comments,
+        atts=atts,                     # ← 여기 이름 고정
+        STATUS_CHOICES=STATUS_CHOICES,
+        PRIORITY_CHOICES=PRIORITY_CHOICES
+    )
 
 # ----- 댓글 -----
-@app.post("/ticket/<int:tid>/comment")
-def add_comment(tid: int):
-    t = Ticket.query.get_or_404(tid)
-    author = request.form.get("author", "").strip() or "user"
-    body   = request.form.get("body", "").strip()
-    if not body:
-        flash("댓글 내용을 입력하세요.", "warning")
-        return redirect(url_for("ticket_detail", tid=tid))
-    c = Comment(ticket_id=t.id, author=author, body=body)
-    db.session.add(c); db.session.commit()
-    add_event(t.id, author, "comment", None, None)
-    return redirect(url_for("ticket_detail", tid=tid))
-
-# ----- 첨부파일 업로드 -----
+# 업로드: 저장 성공 후에만 첨부 INSERT → 커밋
 @app.post("/ticket/<int:tid>/attach")
 def upload_attach(tid: int):
     t = Ticket.query.get_or_404(tid)
-    author = request.form.get("author", "").strip() or "user"
     f = request.files.get("file")
-    if not f or f.filename == "":
+    if not f or not f.filename:
         flash("파일을 선택하세요.", "warning")
         return redirect(url_for("ticket_detail", tid=tid))
 
-    # 저장 경로: /data/files/<ticket_id>/<uuid>__파일명
-    safe_name = secure_filename(f.filename)
-    leaf = f"{uuid.uuid4().hex}__{safe_name or 'file'}"
-    tdir = os.path.join(FILES_DIR, str(t.id))
-    os.makedirs(tdir, exist_ok=True)
-    save_path = os.path.join(tdir, leaf)
-    f.save(save_path)
+    safe_name = secure_filename(f.filename) or "file"
+    target_dir = os.path.join(FILES_DIR, str(t.id))
+    os.makedirs(target_dir, exist_ok=True)
 
+    stored_name = f"{uuid.uuid4().hex}__{safe_name}"
+    save_path = os.path.join(target_dir, stored_name)
+    f.save(save_path)
     size = os.path.getsize(save_path)
-    att = Attachment(ticket_id=t.id, filename=safe_name, stored_path=save_path, size=size)
-    db.session.add(att); db.session.commit()
-    add_event(t.id, author, "attach", None, safe_name)
-    return redirect(url_for("ticket_detail", tid=tid))
+
+    att = Attachment(
+        ticket_id=t.id,
+        filename=safe_name,        # 모델 필드명: filename / stored_path / size
+        stored_path=save_path,
+        size=size,
+    )
+    db.session.add(att)
+    db.session.commit()            # ← 커밋해야 목록에 바로 보임
+
+    flash("업로드 완료.", "ok")
+    return redirect(url_for("ticket_detail", tid=t.id))
 
 # ----- 다운로드 -----
 @app.get("/download/<int:aid>")
 def download_file(aid: int):
     att = Attachment.query.get_or_404(aid)
     if not os.path.isfile(att.stored_path):
-        abort(404)
+        abort(404, "파일이 존재하지 않습니다.")
     return send_file(att.stored_path, as_attachment=True, download_name=att.filename)
 
 # 헬스/버전
