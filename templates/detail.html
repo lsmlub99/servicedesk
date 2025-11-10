@@ -47,8 +47,11 @@
   <button>업로드</button>
 </form>
 
+{# ▼ attachments 또는 atts 어느 쪽이든 받아서 files로 통일 #}
+{% set files = attachments or atts or [] %}
+
 <ul>
-  {% for a in attachments %}  <!-- ← 여기 이름이 attachments 여야 함 -->
+  {% for a in files %}
     <li>
       <a href="{{ url_for('download_file', aid=a.id) }}">{{ a.filename }}</a>
       ({{ (a.size/1024)|round(1) }} KB, {{ a.created_at|dt }})
