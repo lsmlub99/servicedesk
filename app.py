@@ -271,25 +271,20 @@ with app.app_context():
         events=events
     )
 
-
    @app.post("/ticket/<int:tid>/attach")
-    def upload_attach(tid: int):
+def upload_attach(tid: int):
     t = Ticket.query.get_or_404(tid)
-    author = request.form.get("author", "").strip() or "user"
-
     f = request.files.get("file")
     if not f or f.filename == "":
-        flash("파일을 선택하세요.", "warning")
         return redirect(url_for("ticket_detail", tid=tid))
 
-    safe_name = secure_filename(f.filename) or "file"
-    leaf = f"{uuid.uuid4().hex}__{safe_name}"
+    safe_name = secure_filename(f.filename)
+    leaf = f"{uuid.uuid4().hex}__{safe_name or 'file'}"
     tdir = os.path.join(FILES_DIR, str(t.id))
     os.makedirs(tdir, exist_ok=True)
 
     save_path = os.path.join(tdir, leaf)
     f.save(save_path)
-
     size = os.path.getsize(save_path)
 
     att = Attachment(
@@ -298,12 +293,11 @@ with app.app_context():
         stored_path=save_path,
         size=size,
     )
-    db.session.add(att)
-    db.session.commit()
+    db.session.add(att); db.session.commit()
+    add_event(t.id, "user", "attach", None, safe_name)
+    return redirect(url_for("ticket_detail", tid=t.id))
 
-    add_event(t.id, author, "attach", None, safe_name)
-    return redirect(url_for("ticket_detail", tid=tid))
-
+   
     @app.get("/files/<int:aid>")
     def download_file(aid: int):
     a = Attachment.query.get_or_404(aid)
