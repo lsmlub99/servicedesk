@@ -1,64 +1,44 @@
 <!doctype html>
 <html lang="ko">
-<head>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta charset="utf-8" />
-  <title>Service Desk</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 32px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid #eee; }
-    a { color: #0b63f6; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .toolbar { margin: 16px 0; display: flex; gap: 8px; }
-    input, select, button { padding: 6px 10px; }
-  </style>
-</head>
+<head><meta charset="utf-8"><title>Service Desk</title></head>
 <body>
   <h1>Service Desk</h1>
 
-  <div class="toolbar">
-    <form method="get">
-      <input type="text" name="q" placeholder="검색(제목/내용)" value="{{ q or '' }}">
-      <select name="status">
-        <option value="">상태</option>
-        {% for s in ['open','prog','done'] %}
-          <option value="{{ s }}" {{ 'selected' if status==s else '' }}>{{ s }}</option>
-        {% endfor %}
-      </select>
-      <select name="priority">
-        <option value="">우선순위</option>
-        {% for p in ['low','med','high'] %}
-          <option value="{{ p }}" {{ 'selected' if priority==p else '' }}>{{ p }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit">필터</button>
-      <a href="{{ url_for('new_ticket') }}" style="margin-left:8px;">새 요청</a>
-    </form>
-  </div>
+  <form method="get">
+    <input name="q" value="{{ q }}" placeholder="검색(제목/내용)">
+    <select name="status">
+      <option value="">상태(전체)</option>
+      {% for v,lab in STATUS_CHOICES %}
+        <option value="{{v}}" {{ "selected" if status==v else "" }}>{{ lab }}</option>
+      {% endfor %}
+    </select>
+    <select name="priority">
+      <option value="">우선순위(전체)</option>
+      {% for v,lab in PRIORITY_CHOICES %}
+        <option value="{{v}}" {{ "selected" if priority==v else "" }}>{{ lab }}</option>
+      {% endfor %}
+    </select>
+    <button>필터</button>
+  </form>
 
-  <table>
+  <table border="1" cellspacing="0" cellpadding="6">
     <thead>
-      <tr>
-        <th>ID</th><th>제목</th><th>상태</th><th>우선</th><th>요청자</th><th>담당</th><th>수정</th>
-      </tr>
+      <tr><th>ID</th><th>제목</th><th>상태</th><th>우선</th><th>요청자</th><th>수정</th></tr>
     </thead>
     <tbody>
     {% for t in tickets %}
       <tr>
         <td>{{ t.id }}</td>
         <td><a href="{{ url_for('ticket_detail', tid=t.id) }}">{{ t.title }}</a></td>
-        <td>{{ t.status }}</td>
-        <td>{{ t.priority }}</td>
+        <td>{{ t.status|k_status }}</td>
+        <td>{{ t.priority|k_priority }}</td>
         <td>{{ t.requester }}</td>
-        <td>{{ t.assignee or '-' }}</td>
         <td>{{ t.updated_at|dt }}</td>
       </tr>
     {% else %}
-      <tr><td colspan="7">데이터 없음</td></tr>
+      <tr><td colspan="6">데이터 없음</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </body>
 </html>
-

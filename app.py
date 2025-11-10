@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, abort, send_file, flash
+    url_for, abort, send_file, flash, send_from_directory
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
@@ -27,6 +27,29 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
+# ==== 한글 라벨 ====
+STATUS_LABELS = {
+    "open": "접수",
+    "prog": "처리중",
+    "hold": "보류",
+    "done": "완료",
+}
+PRIORITY_LABELS = {
+    "low": "낮음",
+    "med": "보통",
+    "high": "높음",
+    "crit": "긴급",
+}
+
+# 셀렉트용 (value, label)
+STATUS_CHOICES   = [("open","접수"),("prog","처리중"),("hold","보류"),("done","완료")]
+PRIORITY_CHOICES = [("low","낮음"),("med","보통"),("high","높음"),("crit","긴급")]
+
+# ==== 파일 업로드 디렉터리 ====
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/data/files")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
 # --------------------------------------------------------------------
 # 모델
 # --------------------------------------------------------------------
@@ -45,18 +68,19 @@ class Ticket(db.Model):
 class Comment(db.Model):
     __tablename__ = "comments"
     id         = db.Column(db.Integer, primary_key=True)
-    ticket_id  = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False)
-    author     = db.Column(db.String(50), nullable=False)
+    ticket_id  = db.Column(db.Integer, db.ForeignKey("tickets.id"), indes=True)
+    author     = db.Column(db.String(50))
     body       = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class Attachment(db.Model):
     __tablename__ = "attachments"
     id         = db.Column(db.Integer, primary_key=True)
-    ticket_id  = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False)
-    filename   = db.Column(db.String(200), nullable=False)    # 원본 파일명
-    stored_path= db.Column(db.String(300), nullable=False)    # 실제 저장 경로
-    size       = db.Column(db.Integer, nullable=False, default=0)
+    ticket_id  = db.Column(db.Integer, db.ForeignKey("tickets.id"), indes=True)
+    filename   = db.Column(db.String(200))    # 원본 파일명
+    stored_path= db.Column(db.String(300))    # 실제 저장 경로
+    size       = db.Column(db.Integer)
+    mimetype   = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
 class Event(db.Model):
@@ -159,6 +183,27 @@ def add_event(ticket_id: int, actor: str, action: str, from_value=None, to_value
     db.session.add(ev)
     db.session.commit()
 
+@app.template_filter("k_status")
+def k_status(v):
+    return STATUS_LABELS.get(v, v or "")
+
+@app.template_filter("k_priority")
+def k_priority(v):
+    return PRIORITY_LABELS.get(v, v or "")
+
+@app.template_filter("filesize")
+def filesize(n):
+    try:
+        n = int(n or 0)
+    except:
+        return "-"
+    for unit in ["B","KB","MB","GB","TB"]:
+        if n < 1024:
+            return f"{n:.0f} {unit}"
+        n /= 1024
+    return f"{n:.0f} PB"
+
+
 # --------------------------------------------------------------------
 # 라우트
 # --------------------------------------------------------------------
@@ -177,7 +222,7 @@ def index():
         query = query.filter(Ticket.priority == priority)
 
     tickets = query.order_by(Ticket.updated_at.desc()).all()
-    return render_template("index.html", tickets=tickets, q=q, status=status, priority=priority)
+    return render_template("index.html", tickets=tickets, q=q, status=status, priority=priority, STATUS_CHOICES=STATUS_CHOICES, PRIORITY_CHOICES=PRIORITY_CHOICES)
 
 @app.route("/new", methods=["GET", "POST"])
 def new_ticket():

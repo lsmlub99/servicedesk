@@ -1,80 +1,60 @@
 <!doctype html>
 <html lang="ko">
-<head>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<meta charset="utf-8"><title>요청 상세</title></head>
+<head><meta charset="utf-8"><title>#{{ ticket.id }} - {{ ticket.title }}</title></head>
 <body>
-  <h1>[#{{ ticket.id }}] {{ ticket.title }}</h1>
-  <p><b>요청자:</b> {{ ticket.requester }} / <b>담당자:</b> {{ ticket.assignee or '-' }}</p>
-  <p><b>상태:</b> {{ ticket.status }} / <b>우선순위:</b> {{ ticket.priority }}</p>
-  <pre>{{ ticket.content }}</pre>
+  <h2>[#{{ ticket.id }}] {{ ticket.title }}</h2>
+  <p>요청자: {{ ticket.requester }} / 담당자: {{ ticket.assignee or "-" }}</p>
+  <p>상태: {{ ticket.status|k_status }} · 우선순위: {{ ticket.priority|k_priority }}</p>
 
-  <form method="post">
-    <label>상태
-      <select name="status">
-        <option value="open"  {{ 'selected' if ticket.status=='open'  else '' }}>open</option>
-        <option value="prog"  {{ 'selected' if ticket.status=='prog'  else '' }}>prog</option>
-        <option value="done"  {{ 'selected' if ticket.status=='done'  else '' }}>done</option>
-      </select>
-    </label>
-    <label>담당자 <input name="assignee" value="{{ ticket.assignee or '' }}"></label>
-    <button type="submit">저장</button>
+  <!-- 상태/담당자/우선 저장 -->
+  <form method="post" action="{{ url_for('ticket_update', tid=ticket.id) }}">
+    <select name="status">
+      {% for v,lab in STATUS_CHOICES %}
+        <option value="{{v}}" {{ "selected" if ticket.status==v else "" }}>{{ lab }}</option>
+      {% endfor %}
+    </select>
+    <input name="assignee" placeholder="담당자" value="{{ ticket.assignee or "" }}">
+    <select name="priority">
+      {% for v,lab in PRIORITY_CHOICES %}
+        <option value="{{v}}" {{ "selected" if ticket.priority==v else "" }}>{{ lab }}</option>
+      {% endfor %}
+    </select>
+    <button>저장</button>
   </form>
 
-<h2>댓글</h2>
-<form method="post" action="{{ url_for('add_comment', tid=ticket.id) }}">
-  <div class="toolbar">
+  <hr>
+
+  <h3>댓글</h3>
+  <form method="post" action="{{ url_for('ticket_comment', tid=ticket.id) }}">
     <input name="author" placeholder="작성자(옵션)">
-    <input name="body" placeholder="댓글 내용을 입력하세요" style="width:360px">
+    <input name="content" placeholder="댓글 내용을 입력하세요">
     <button>등록</button>
-  </div>
-</form>
-{% for c in comments %}
-  <div>
-    <strong>{{ c.author }}</strong> · {{ c.created_at|dt }}<br>
-    <pre>{{ c.body }}</pre>
-  </div>
-{% else %}
-  <div class="muted">댓글 없음</div>
-{% endfor %}
+  </form>
+  <ul>
+    {% for c in comments %}
+      <li>{{ c.created_at|dt }} · <b>{{ c.author or 'user' }}</b> : {{ c.content }}</li>
+    {% else %}
+      <li>댓글 없음</li>
+    {% endfor %}
+  </ul>
 
-<hr>
+  <hr>
 
-<h2>첨부</h2>
-<form method="post" action="{{ url_for('upload_attach', tid=ticket.id) }}" enctype="multipart/form-data">
-  <div class="toolbar">
+  <h3>첨부</h3>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('ticket_upload', tid=ticket.id) }}">
     <input type="file" name="file">
     <button>업로드</button>
-  </div>
-</form>
-
-<ul>
-{% for a in atts %}
-  <li>
-    <a href="{{ url_for('download_file', aid=a.id) }}">{{ a.filename }}</a>
-    <span class="muted">({{ (a.size / 1024) | round(1) }}, {{ a.created_at|dt }})</span>
-  </li>
-{% else %}
-  <li class="muted">첨부 없음</li>
-{% endfor %}
-</ul>
-
-<hr>
-
-<h2>이력</h2>
-<ul>
-{% for e in events %}
-  <li>
-    <strong>{{ e.action }}</strong> by {{ e.actor }} · {{ e.created_at|dt }}
-    {% if e.from_value or e.to_value %}
-      — {{ e.from_value }} → {{ e.to_value }}
-    {% endif %}
-  </li>
-{% else %}
-  <li class="muted">이력 없음</li>
-{% endfor %}
-</ul>
-
+  </form>
+  <ul>
+    {% for f in files %}
+      <li>
+        <a href="{{ url_for('file_download', aid=f.id) }}">{{ f.orig_name }}</a>
+        ({{ f.size|filesize }})
+      </li>
+    {% else %}
+      <li>첨부 없음</li>
+    {% endfor %}
+  </ul>
 
   <p><a href="{{ url_for('index') }}">← 목록</a></p>
 </body>
