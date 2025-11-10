@@ -173,26 +173,26 @@ with app.app_context():
 # --------------------------------------------------------------------
 # 공용 유틸/필터
 # --------------------------------------------------------------------
-@app.template_filter("dt")
-def fmt_dt(v: datetime):
+   @app.template_filter("dt")
+    def fmt_dt(v: datetime):
     return v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime) else (v or "")
 
-def add_event(ticket_id: int, actor: str, action: str, from_value=None, to_value=None):
+    def add_event(ticket_id: int, actor: str, action: str, from_value=None, to_value=None):
     ev = Event(ticket_id=ticket_id, actor=actor, action=action,
                from_value=from_value, to_value=to_value)
     db.session.add(ev)
     db.session.commit()
 
-@app.template_filter("k_status")
-def k_status(v):
+   @app.template_filter("k_status") 
+    def k_status(v):
     return STATUS_LABELS.get(v, v or "")
 
-@app.template_filter("k_priority")
-def k_priority(v):
+   @app.template_filter("k_priority")
+    def k_priority(v):
     return PRIORITY_LABELS.get(v, v or "")
 
-@app.template_filter("filesize")
-def filesize(n):
+   @app.template_filter("filesize")
+    def filesize(n):
     try:
         n = int(n or 0)
     except:
@@ -204,11 +204,11 @@ def filesize(n):
     return f"{n:.0f} PB"
 
 
-# --------------------------------------------------------------------
-# 라우트
-# --------------------------------------------------------------------
-@app.get("/")
-def index():
+    # --------------------------------------------------------------------
+    # 라우트
+    # --------------------------------------------------------------------
+   @app.get("/")
+    def index():
     q        = request.args.get("q", "").strip()
     status   = request.args.get("status", "").strip()
     priority = request.args.get("priority", "").strip()
@@ -224,8 +224,8 @@ def index():
     tickets = query.order_by(Ticket.updated_at.desc()).all()
     return render_template("index.html", tickets=tickets, q=q, status=status, priority=priority, STATUS_CHOICES=STATUS_CHOICES, PRIORITY_CHOICES=PRIORITY_CHOICES)
 
-@app.route("/new", methods=["GET", "POST"])
-def new_ticket():
+   @app.route("/new", methods=["GET", "POST"])
+    def new_ticket():
     if request.method == "POST":
         title     = request.form.get("title", "").strip()
         content   = request.form.get("content", "").strip()
@@ -240,86 +240,85 @@ def new_ticket():
         return redirect(url_for("ticket_detail", tid=t.id))
     return render_template("new.html")
 
-@app.route("/ticket/<int:tid>")
-def ticket_detail(tid: int):
+   # 상세
+   @app.route("/ticket/<int:tid>", methods=["GET", "POST"])
+    def ticket_detail(tid: int):
     t = Ticket.query.get_or_404(tid)
 
-    comments = Comment.query.filter_by(ticket_id=tid) \
-                            .order_by(Comment.created_at.asc()) \
-                            .all()
+    if request.method == "POST":
+        # 상태/담당자 저장
+        t.status = request.form.get("status", t.status)
+        t.assignee = request.form.get("assignee", t.assignee)
+        db.session.commit()
+        add_event(t.id, request.form.get("author", "user") or "user",
+                  "update", None, f"{t.status}/{t.assignee or '-'}")
+        return redirect(url_for("ticket_detail", tid=tid))
 
-    atts = Attachment.query.filter_by(ticket_id=tid) \
-                           .order_by(Attachment.created_at.asc()) \
-                           .all()
+    # 목록들 조회
+    comments = Comment.query.filter_by(ticket_id=tid)\
+        .order_by(Comment.id.desc()).all()
+    files = Attachment.query.filter_by(ticket_id=tid)\
+        .order_by(Attachment.id.desc()).all()
+    events = Event.query.filter_by(ticket_id=tid)\
+        .order_by(Event.id.desc()).all()
 
-    # events를 템플릿에서 쓰고 있으니, 모델이 있으면 실제 쿼리로, 없으면 빈 리스트라도 넘겨줘
-    try:
-        events = Event.query.filter_by(ticket_id=tid) \
-                            .order_by(Event.created_at.asc()) \
-                            .all()
-    except Exception:
-        events = []
-
+    # → 템플릿으로 넘길 이름을 'attachments' 로 고정
     return render_template(
         "detail.html",
         ticket=t,
         comments=comments,
-	attachments=attachments,
-        events=events,             # 템플릿에서 사용 중
-        STATUS_CHOICES=STATUS_CHOICES,
-        PRIORITY_CHOICES=PRIORITY_CHOICES,
+        attachments=files,   # ★ 여기 이름!
+        events=events
     )
 
 
-# ----- 댓글 -----
-# 업로드: 저장 성공 후에만 첨부 INSERT → 커밋
-@app.post("/ticket/<int:tid>/attach")
-def upload_attach(tid: int):
+   @app.post("/ticket/<int:tid>/attach")
+    def upload_attach(tid: int):
     t = Ticket.query.get_or_404(tid)
+    author = request.form.get("author", "").strip() or "user"
+
     f = request.files.get("file")
-    if not f or not f.filename:
+    if not f or f.filename == "":
         flash("파일을 선택하세요.", "warning")
         return redirect(url_for("ticket_detail", tid=tid))
 
     safe_name = secure_filename(f.filename) or "file"
-    target_dir = os.path.join(FILES_DIR, str(t.id))
-    os.makedirs(target_dir, exist_ok=True)
+    leaf = f"{uuid.uuid4().hex}__{safe_name}"
+    tdir = os.path.join(FILES_DIR, str(t.id))
+    os.makedirs(tdir, exist_ok=True)
 
-    stored_name = f"{uuid.uuid4().hex}__{safe_name}"
-    save_path = os.path.join(target_dir, stored_name)
+    save_path = os.path.join(tdir, leaf)
     f.save(save_path)
+
     size = os.path.getsize(save_path)
 
     att = Attachment(
         ticket_id=t.id,
-        filename=safe_name,        # 모델 필드명: filename / stored_path / size
+        filename=safe_name,
         stored_path=save_path,
         size=size,
     )
     db.session.add(att)
-    db.session.commit()            # ← 커밋해야 목록에 바로 보임
+    db.session.commit()
 
-    flash("업로드 완료.", "ok")
-    return redirect(url_for("ticket_detail", tid=t.id))
+    add_event(t.id, author, "attach", None, safe_name)
+    return redirect(url_for("ticket_detail", tid=tid))
 
-# ----- 다운로드 -----
-@app.get("/download/<int:aid>")
-def download_file(aid: int):
-    att = Attachment.query.get_or_404(aid)
-    if not os.path.isfile(att.stored_path):
-        abort(404, "파일이 존재하지 않습니다.")
-    return send_file(att.stored_path, as_attachment=True, download_name=att.filename)
+    @app.get("/files/<int:aid>")
+    def download_file(aid: int):
+    a = Attachment.query.get_or_404(aid)
+    return send_file(a.stored_path, as_attachment=True, download_name=a.filename)
 
-# 헬스/버전
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
+	# 헬스/버전
+	@app.get("/healthz")
+	def healthz():
+	    return "ok", 200
 
-@app.get("/version")
-def version():
-    tag = os.getenv("APP_VERSION", "v1")
-    return f"<h1>Service Desk ({tag})</h1>", 200
+	@app.get("/version")
+	def version():
+	    tag = os.getenv("APP_VERSION", "v1")
+	    return f"<h1>Service Desk ({tag})</h1>", 200
 
-if __name__ == "__main__":
-    # 개발 로컬 실행용(도커에선 gunicorn 사용)
-    app.run(host="0.0.0.0", port=8080, debug=True)
+	if __name__ == "__main__":
+	    # 개발 로컬 실행용(도커에선 gunicorn 사용)
+	    app.run(host="0.0.0.0", port=8080, debug=True)
