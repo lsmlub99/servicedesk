@@ -240,20 +240,36 @@ def new_ticket():
         return redirect(url_for("ticket_detail", tid=t.id))
     return render_template("new.html")
 
-# 상세: 항상 atts 라는 이름으로 넘김
 @app.route("/ticket/<int:tid>")
 def ticket_detail(tid: int):
     t = Ticket.query.get_or_404(tid)
-    atts = Attachment.query.filter_by(ticket_id=tid).order_by(Attachment.created_at.asc()).all()
-    comments = Comment.query.filter_by(ticket_id=tid).order_by(Comment.created_at.asc()).all()
+
+    comments = Comment.query.filter_by(ticket_id=tid) \
+                            .order_by(Comment.created_at.asc()) \
+                            .all()
+
+    atts = Attachment.query.filter_by(ticket_id=tid) \
+                           .order_by(Attachment.created_at.asc()) \
+                           .all()
+
+    # events를 템플릿에서 쓰고 있으니, 모델이 있으면 실제 쿼리로, 없으면 빈 리스트라도 넘겨줘
+    try:
+        events = Event.query.filter_by(ticket_id=tid) \
+                            .order_by(Event.created_at.asc()) \
+                            .all()
+    except Exception:
+        events = []
+
     return render_template(
         "detail.html",
         ticket=t,
         comments=comments,
-        atts=atts,                     # ← 여기 이름 고정
+	attachments=attachments,
+        events=events,             # 템플릿에서 사용 중
         STATUS_CHOICES=STATUS_CHOICES,
-        PRIORITY_CHOICES=PRIORITY_CHOICES
+        PRIORITY_CHOICES=PRIORITY_CHOICES,
     )
+
 
 # ----- 댓글 -----
 # 업로드: 저장 성공 후에만 첨부 INSERT → 커밋
